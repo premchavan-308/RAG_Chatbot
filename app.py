@@ -11,8 +11,18 @@ st.set_page_config(
 )
 
 st.title("📚 RAG Chatbot")
-
 st.write("Upload any PDF and ask questions from it.")
+
+# ---------------- Session State ---------------- #
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "db_ready" not in st.session_state:
+    st.session_state.db_ready = False
+
+if "current_pdf" not in st.session_state:
+    st.session_state.current_pdf = None
 
 # ---------------- Upload PDF ---------------- #
 
@@ -23,59 +33,69 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
 
-    with tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=".pdf"
-    ) as tmp:
+    # Check if a NEW PDF was uploaded
+    if st.session_state.current_pdf != uploaded_file.name:
 
-        tmp.write(uploaded_file.read())
-        pdf_path = tmp.name
+        st.session_state.current_pdf = uploaded_file.name
+        st.session_state.messages = []
+        st.session_state.db_ready = False
 
-    st.success("✅ PDF Uploaded")
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".pdf"
+        ) as tmp:
 
-    if st.button("Create Vector Database"):
+            tmp.write(uploaded_file.read())
+            pdf_path = tmp.name
 
         with st.spinner("Creating Vector Database..."):
 
             create_vector_db(pdf_path)
 
+        st.session_state.db_ready = True
+
         st.success("✅ Vector Database Ready!")
 
-# ---------------- Chat ---------------- #
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# ---------------- Display Chat ---------------- #
 
 for message in st.session_state.messages:
 
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# ---------------- Chat Input ---------------- #
+
 question = st.chat_input("Ask anything from your PDF...")
 
 if question:
 
-    st.session_state.messages.append(
-        {
-            "role":"user",
-            "content":question
-        }
-    )
+    if not st.session_state.db_ready:
 
-    with st.chat_message("user"):
-        st.markdown(question)
+        st.warning("⚠ Please upload a PDF first.")
 
-    with st.chat_message("assistant"):
+    else:
 
-        with st.spinner("Searching..."):
+        st.session_state.messages.append(
+            {
+                "role": "user",
+                "content": question
+            }
+        )
 
-            answer = ask(question)
+        with st.chat_message("user"):
+            st.markdown(question)
 
-            st.markdown(answer)
+        with st.chat_message("assistant"):
 
-    st.session_state.messages.append(
-        {
-            "role":"assistant",
-            "content":answer
-        }
-    )
+            with st.spinner("Searching document..."):
+
+                answer = ask(question)
+
+                st.markdown(answer)
+
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": answer
+            }
+        )
