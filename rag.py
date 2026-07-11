@@ -20,12 +20,14 @@ llm = ChatMistralAI(
 )
 
 template = """
-You are a helpful AI assistant.
+You are an AI assistant that answers ONLY from the uploaded PDF.
 
-Answer ONLY from the supplied context.
-
-If the answer is not available in the context,
-say "I don't know."
+Rules:
+- Use only the provided context.
+- Never use outside knowledge.
+- If the answer is missing from the context, reply:
+"I couldn't find this information in the uploaded PDF."
+- Mention page numbers whenever possible.
 
 Context:
 {context}
@@ -48,7 +50,7 @@ def ask(question):
     retriever = db.as_retriever(
     search_type="mmr",
     search_kwargs={
-        "k": 3,
+        "k": 4,
         "fetch_k": 10,
         "lambda_mult": 0.5
     }
@@ -64,10 +66,15 @@ def ask(question):
         print(doc.page_content[:300])
         print("-" * 50)
 
-    context = "\n\n".join(
-        doc.page_content
-        for doc in docs
-    )
+    context = ""
+
+    for doc in docs:
+
+        page = doc.metadata.get("page", 0)
+
+        context += f"\n(Page {page+1})\n"
+        context += doc.page_content
+        context += "\n\n"
 
     chain = prompt | llm
 
