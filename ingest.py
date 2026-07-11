@@ -6,10 +6,17 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_mistralai import MistralAIEmbeddings
 from langchain_chroma import Chroma
-
+import os
+import shutil
+import gc
 
 def create_vector_db(pdf_path):
 
+    gc.collect()
+
+    if os.path.exists("chroma_db"):
+        shutil.rmtree("chroma_db", ignore_errors=True)
+    
     loader = PyPDFLoader(pdf_path)
     docs = loader.load()
 
